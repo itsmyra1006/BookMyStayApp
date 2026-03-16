@@ -1,65 +1,63 @@
-abstract class Room {
-    String type;
-    int beds;
-    double price;
+import java.util.HashMap;
+import java.util.Map;
 
-    Room(String type, int beds, double price) {
-        this.type = type;
-        this.beds = beds;
-        this.price = price;
+class RoomInventory {
+    private Map<String, Integer> inventory;
+
+    // Constructor initializes inventory with room types and counts
+    public RoomInventory(Map<String, Integer> initialInventory) {
+        this.inventory = new HashMap<>(initialInventory);
     }
 
-    void display() {
-        System.out.println("Room Type: " + type);
-        System.out.println("Beds: " + beds);
-        System.out.println("Price: ₹" + price);
+    // Retrieve current availability for a specific room type
+    public int getAvailability(String roomType) {
+        return inventory.getOrDefault(roomType, 0);
     }
-}
 
-class SingleRoom extends Room {
-    SingleRoom() {
-        super("Single Room", 1, 2000);
+    // Controlled update of availability
+    public void updateAvailability(String roomType, int newCount) {
+        if (newCount >= 0) {
+            inventory.put(roomType, newCount);
+        } else {
+            System.out.println("Invalid update: availability cannot be negative.");
+        }
     }
-}
 
-class DoubleRoom extends Room {
-    DoubleRoom() {
-        super("Double Room", 2, 3500);
-    }
-}
-
-class SuiteRoom extends Room {
-    SuiteRoom() {
-        super("Suite Room", 3, 6000);
+    // Display the entire inventory state
+    public void displayInventory() {
+        System.out.println("Current Room Inventory:");
+        for (Map.Entry<String, Integer> entry : inventory.entrySet()) {
+            System.out.println(entry.getKey() + " : " + entry.getValue());
+        }
     }
 }
 
-public class BookMyStayApp{
-
+public class BookMyStayApp {
     public static void main(String[] args) {
+        // Initialize inventory with room types
+        Map<String, Integer> initialRooms = new HashMap<>();
+        initialRooms.put("Single", 10);
+        initialRooms.put("Double", 5);
+        initialRooms.put("Suite", 2);
 
-        System.out.println(" Welcome to Book My Stay App ");
-        System.out.println(" Hotel Booking System v2.1 ");
-        System.out.println("x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x");
+        RoomInventory inventory = new RoomInventory(initialRooms);
 
-        Room single = new SingleRoom();
-        Room doubleRoom = new DoubleRoom();
-        Room suite = new SuiteRoom();
+        // Display initial state
+        inventory.displayInventory();
 
-        int singleAvailable = 5;
-        int doubleAvailable = 3;
-        int suiteAvailable = 2;
+        // Simulate booking a Single room
+        System.out.println("\nBooking a Single room...");
+        int singleAvailable = inventory.getAvailability("Single");
+        inventory.updateAvailability("Single", singleAvailable - 1);
 
-        System.out.println("\nSingle Room Details:");
-        single.display();
-        System.out.println("Available: " + singleAvailable);
+        // Display updated state
+        inventory.displayInventory();
 
-        System.out.println("\nDouble Room Details:");
-        doubleRoom.display();
-        System.out.println("Available: " + doubleAvailable);
+        // Add a new room type dynamically
+        System.out.println("\nAdding Deluxe room type...");
+        inventory.updateAvailability("Deluxe", 3);
 
-        System.out.println("\nSuite Room Details:");
-        suite.display();
-        System.out.println("Available: " + suiteAvailable);
+        // Display final state
+        inventory.displayInventory();
     }
 }
