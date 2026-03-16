@@ -30,11 +30,11 @@ class RoomInventory {
         this.inventory = new HashMap<>(initialInventory);
     }
 
-    public int getAvailability(String roomType) {
+    public synchronized int getAvailability(String roomType) {
         return inventory.getOrDefault(roomType, 0);
     }
 
-    public void updateAvailability(String roomType, int newCount) {
+    public synchronized void updateAvailability(String roomType, int newCount) {
         if (newCount >= 0) {
             inventory.put(roomType, newCount);
         } else {
@@ -44,30 +44,6 @@ class RoomInventory {
 
     public Map<String, Integer> getInventorySnapshot() {
         return new HashMap<>(inventory); // Defensive copy
-    }
-}
-
-// Read-only search service
-class SearchService {
-    private RoomInventory inventory;
-    private Map<String, Room> roomDetails;
-
-    public SearchService(RoomInventory inventory, Map<String, Room> roomDetails) {
-        this.inventory = inventory;
-        this.roomDetails = roomDetails;
-    }
-
-    public void searchAvailableRooms() {
-        System.out.println("\nAvailable Rooms:");
-        for (Map.Entry<String, Room> entry : roomDetails.entrySet()) {
-            String roomType = entry.getKey();
-            int available = inventory.getAvailability(roomType);
-
-            if (available > 0) {
-                Room room = entry.getValue();
-                System.out.println(room.toString() + " | Available: " + available);
-            }
-        }
     }
 }
 
@@ -99,14 +75,64 @@ class BookingRequestQueue {
     }
 
     public void addRequest(Reservation reservation) {
-        requestQueue.offer(reservation); // FIFO insertion
+        requestQueue.offer(reservation);
         System.out.println("Added to queue: " + reservation);
     }
 
-    public void displayQueue() {
-        System.out.println("\nCurrent Booking Request Queue:");
-        for (Reservation r : requestQueue) {
-            System.out.println(r);
+    public Reservation pollRequest() {
+        return requestQueue.poll(); // FIFO dequeue
+    }
+
+    public boolean isEmpty() {
+        return requestQueue.isEmpty();
+    }
+}
+
+// Booking Service handles allocation
+class BookingService {
+    private RoomInventory inventory;
+    private Map<String, Set<String>> allocatedRooms; // roomType -> set of room IDs
+
+    public BookingService(RoomInventory inventory) {
+        this.inventory = inventory;
+        this.allocatedRooms = new HashMap<>();
+    }
+
+    public void processRequests(BookingRequestQueue queue) {
+        while (!queue.isEmpty()) {
+            Reservation request = queue.pollRequest();
+            allocateRoom(request);
+        }
+    }
+
+    private void allocateRoom(Reservation request) {
+        String roomType = request.getRoomType();
+        int available = inventory.getAvailability(roomType);
+
+        if (available > 0) {
+            // Generate unique room ID
+            String roomId = UUID.randomUUID().toString();
+
+            // Ensure uniqueness using Set
+            allocatedRooms.putIfAbsent(roomType, new HashSet<>());
+            allocatedRooms.get(roomType).add(roomId);
+
+            // Update inventory immediately
+            inventory.updateAvailability(roomType, available - 1);
+
+            System.out.println("Confirmed Reservation: Guest=" + request.getGuestName() +
+                    ", RoomType=" + roomType +
+                    ", RoomID=" + roomId);
+        } else {
+            System.out.println("Reservation Failed: No availability for " + roomType +
+                    " (Guest=" + request.getGuestName() + ")");
+        }
+    }
+
+    public void displayAllocations() {
+        System.out.println("\nAllocated Rooms:");
+        for (Map.Entry<String, Set<String>> entry : allocatedRooms.entrySet()) {
+            System.out.println(entry.getKey() + " -> " + entry.getValue());
         }
     }
 }
@@ -115,33 +141,25 @@ public class BookMyStayApp {
     public static void main(String[] args) {
         // Initialize inventory
         Map<String, Integer> initialRooms = new HashMap<>();
-        initialRooms.put("Single", 10);
-        initialRooms.put("Double", 5);
-        initialRooms.put("Suite", 2);
+        initialRooms.put("Single", 2);
+        initialRooms.put("Double", 1);
+        initialRooms.put("Suite", 1);
 
         RoomInventory inventory = new RoomInventory(initialRooms);
 
-        // Initialize room details
-        Map<String, Room> roomDetails = new HashMap<>();
-        roomDetails.put("Single", new Room("Single", 50.0, "WiFi, TV"));
-        roomDetails.put("Double", new Room("Double", 90.0, "WiFi, TV, Mini-bar"));
-        roomDetails.put("Suite", new Room("Suite", 200.0, "WiFi, TV, Mini-bar, Jacuzzi"));
-
-        // Search service
-        SearchService searchService = new SearchService(inventory, roomDetails);
-        searchService.searchAvailableRooms();
-
         // Booking request queue
         BookingRequestQueue bookingQueue = new BookingRequestQueue();
-
-        // Guests submit booking requests
         bookingQueue.addRequest(new Reservation("Alice", "Single"));
         bookingQueue.addRequest(new Reservation("Bob", "Suite"));
-        bookingQueue.addRequest(new Reservation("Charlie", "Double"));
+        bookingQueue.addRequest(new Reservation("Charlie", "Single"));
+        bookingQueue.addRequest(new Reservation("Diana", "Double"));
+        bookingQueue.addRequest(new Reservation("Eve", "Suite")); // Will fail if no availability
 
-        // Display queue state
-        bookingQueue.displayQueue();
+        // Booking service processes requests
+        BookingService bookingService = new BookingService(inventory);
+        bookingService.processRequests(bookingQueue);
 
-        // Note: No inventory mutation yet — requests are only queued
+        // Display final allocations
+        bookingService.displayAllocations();
     }
 }
