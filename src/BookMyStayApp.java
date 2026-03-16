@@ -1,6 +1,6 @@
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 
+// Domain model for Room details
 class Room {
     private String type;
     private double price;
@@ -12,17 +12,9 @@ class Room {
         this.amenities = amenities;
     }
 
-    public String getType() {
-        return type;
-    }
-
-    public double getPrice() {
-        return price;
-    }
-
-    public String getAmenities() {
-        return amenities;
-    }
+    public String getType() { return type; }
+    public double getPrice() { return price; }
+    public String getAmenities() { return amenities; }
 
     @Override
     public String toString() {
@@ -30,6 +22,7 @@ class Room {
     }
 }
 
+// Centralized inventory management
 class RoomInventory {
     private Map<String, Integer> inventory;
 
@@ -50,10 +43,11 @@ class RoomInventory {
     }
 
     public Map<String, Integer> getInventorySnapshot() {
-        return new HashMap<>(inventory);
+        return new HashMap<>(inventory); // Defensive copy
     }
 }
 
+// Read-only search service
 class SearchService {
     private RoomInventory inventory;
     private Map<String, Room> roomDetails;
@@ -77,8 +71,49 @@ class SearchService {
     }
 }
 
+// Reservation represents guest intent
+class Reservation {
+    private String guestName;
+    private String roomType;
+
+    public Reservation(String guestName, String roomType) {
+        this.guestName = guestName;
+        this.roomType = roomType;
+    }
+
+    public String getGuestName() { return guestName; }
+    public String getRoomType() { return roomType; }
+
+    @Override
+    public String toString() {
+        return "Reservation Request: Guest=" + guestName + ", RoomType=" + roomType;
+    }
+}
+
+// Booking Request Queue (FIFO)
+class BookingRequestQueue {
+    private Queue<Reservation> requestQueue;
+
+    public BookingRequestQueue() {
+        this.requestQueue = new LinkedList<>();
+    }
+
+    public void addRequest(Reservation reservation) {
+        requestQueue.offer(reservation); // FIFO insertion
+        System.out.println("Added to queue: " + reservation);
+    }
+
+    public void displayQueue() {
+        System.out.println("\nCurrent Booking Request Queue:");
+        for (Reservation r : requestQueue) {
+            System.out.println(r);
+        }
+    }
+}
+
 public class BookMyStayApp {
     public static void main(String[] args) {
+        // Initialize inventory
         Map<String, Integer> initialRooms = new HashMap<>();
         initialRooms.put("Single", 10);
         initialRooms.put("Double", 5);
@@ -86,19 +121,27 @@ public class BookMyStayApp {
 
         RoomInventory inventory = new RoomInventory(initialRooms);
 
+        // Initialize room details
         Map<String, Room> roomDetails = new HashMap<>();
         roomDetails.put("Single", new Room("Single", 50.0, "WiFi, TV"));
         roomDetails.put("Double", new Room("Double", 90.0, "WiFi, TV, Mini-bar"));
         roomDetails.put("Suite", new Room("Suite", 200.0, "WiFi, TV, Mini-bar, Jacuzzi"));
 
+        // Search service
         SearchService searchService = new SearchService(inventory, roomDetails);
-
         searchService.searchAvailableRooms();
 
-        System.out.println("\nBooking a Single room...");
-        int singleAvailable = inventory.getAvailability("Single");
-        inventory.updateAvailability("Single", singleAvailable - 1);
+        // Booking request queue
+        BookingRequestQueue bookingQueue = new BookingRequestQueue();
 
-        searchService.searchAvailableRooms();
+        // Guests submit booking requests
+        bookingQueue.addRequest(new Reservation("Alice", "Single"));
+        bookingQueue.addRequest(new Reservation("Bob", "Suite"));
+        bookingQueue.addRequest(new Reservation("Charlie", "Double"));
+
+        // Display queue state
+        bookingQueue.displayQueue();
+
+        // Note: No inventory mutation yet — requests are only queued
     }
 }
